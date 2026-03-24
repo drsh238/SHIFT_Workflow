@@ -5,25 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SHIFT</title>
   <style>
-    body { margin:0; padding:20px; font-family:system-ui,sans-serif; }
-    .frame { width:100%; height:90vh; border:1px solid #ddd; border-radius:12px; }
-    .nav-bar { margin-bottom: 8px; font-size: 1.1em; }
-    .nav-bar a { color: #7b68ee; text-decoration: none; }
+    body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; }
+    .nav-bar { margin-bottom: 8px; font-size: 1.1em; min-height: 1.4em; }
+    .nav-bar a { color: #7b68ee; text-decoration: none; cursor: pointer; }
     .nav-bar a:hover { text-decoration: underline; }
     .nav-bar .component-name { font-weight: 600; }
+    #svg-container {
+      width: 100%;
+      height: 90vh;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      overflow: auto;
+      background: #fff;
+    }
+    #svg-container svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 100%;
+    }
   </style>
 </head>
 <body>
   <h2>SHIFT</h2>
   <div class="nav-bar" id="nav-bar"></div>
-  <iframe id="svg-frame" class="frame" src="svgs/Main.svg"></iframe>
+  <div id="svg-container"></div>
 
   <script>
-    const frame = document.getElementById('svg-frame');
+    const container = document.getElementById('svg-container');
     const navBar = document.getElementById('nav-bar');
     const navStack = []; // stack of { svg, name }
 
-    // Map folder/path keywords to SVG filenames and display names
+    // Map folder names (from the file:/// links) to SVG paths and display names
     const componentMap = {
       'asset-management':        { svg: 'svgs/Asset-Management.svg',        name: 'Asset Management' },
       'benefit-cost':            { svg: 'svgs/Benefit-Cost.svg',            name: 'Benefit Cost' },
@@ -37,19 +50,6 @@
       'safety':                  { svg: 'svgs/Safety.svg',                  name: 'Safety' }
     };
 
-    function updateNav() {
-      if (navStack.length === 0) {
-        navBar.innerHTML = '';
-      } else {
-        const current = navStack[navStack.length - 1];
-        navBar.innerHTML = '<a href="#" id="back-link">← Back</a> <span class="component-name">' + current.name + '</span>';
-        document.getElementById('back-link').addEventListener('click', function(e) {
-          e.preventDefault();
-          goBack();
-        });
-      }
-    }
-
     function resolveComponent(href) {
       if (!href) return null;
       const lower = href.toLowerCase();
@@ -59,58 +59,90 @@
       return null;
     }
 
-    function interceptLinks() {
-      try {
-        const doc = frame.contentDocument || frame.contentWindow.document;
-        if (!doc) return;
-
-        // Handle both SVG <a> (with xlink:href or href) and HTML <a>
-        const links = doc.querySelectorAll('a');
-        links.forEach(function(link) {
-          // Clone and replace to remove any existing listeners
-          const newLink = link.cloneNode(true);
-          link.parentNode.replaceChild(newLink, link);
-
-          newLink.addEventListener('click', function(e) {
-            const href = this.getAttribute('href')
-                      || this.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
-                      || '';
-            const comp = resolveComponent(href);
-            if (comp) {
-              e.preventDefault();
-              e.stopPropagation();
-              navigateTo(comp);
-            }
-            // If not a known component link, let it behave normally
-          });
+    function updateNav() {
+      if (navStack.length === 0) {
+        navBar.innerHTML = '';
+      } else {
+        const current = navStack[navStack.length - 1];
+        navBar.innerHTML = '';
+        const backLink = document.createElement('a');
+        backLink.textContent = '\u2190 Back';
+        backLink.addEventListener('click', function(e) {
+          e.preventDefault();
+          goBack();
         });
-      } catch (err) {
-        console.warn('Could not intercept links in iframe:', err);
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'component-name';
+        nameSpan.textContent = ' ' + current.name;
+        navBar.appendChild(backLink);
+        navBar.appendChild(nameSpan);
       }
+    }
+
+    async function loadSVG(svgPath) {
+      try {
+        const response = await fetch(svgPath);
+        if (!response.ok) throw new Error('Failed to load ' + svgPath);
+        const svgText = await response.text();
+        container.innerHTML = svgText;
+        attachLinkHandlers();
+      } catch (err) {
+        console.error('Error loading SVG:', err);
+        container.innerHTML = '<p style="padding:20px;color:red;">Error loading diagram: ' + err.message + '</p>';
+      }
+    }
+
+    function attachLinkHandlers() {
+      // Get all <a> elements (works for both SVG and HTML namespace)
+      const links = container.querySelectorAll('a');
+      links.forEach(function(link) {
+        const href = link.getAttribute('href')
+                  || link.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+                  || '';
+        const comp = resolveComponent(href);
+        if (comp) {
+          link.style.cursor = 'pointer';
+          // Remove the original href so browser doesn't try to navigate
+          link.removeAttribute('href');
+          link.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            navigateTo(comp);
+          });
+        } else {
+          // For any non-component links, prevent file:/// navigation
+          if (href.startsWith('file:///')) {
+            link.removeAttribute('href');
+            link.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
+          }
+        }
+      });
     }
 
     function navigateTo(comp) {
       navStack.push(comp);
-      frame.src = comp.svg;
+      loadSVG(comp.svg);
       updateNav();
+      container.scrollTop = 0;
     }
 
     function goBack() {
       if (navStack.length > 0) {
         navStack.pop();
         if (navStack.length > 0) {
-          // Go to previous component
           const prev = navStack[navStack.length - 1];
-          frame.src = prev.svg;
+          loadSVG(prev.svg);
         } else {
-          // Go back to main
-          frame.src = 'svgs/Main.svg';
+          loadSVG('svgs/Main.svg');
         }
         updateNav();
+        container.scrollTop = 0;
       }
     }
 
-    frame.addEventListener('load', interceptLinks);
+    // Initial load
+    loadSVG('svgs/Main.svg');
   </script>
 </body>
 </html>
