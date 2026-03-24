@@ -7,10 +7,110 @@
   <style>
     body { margin:0; padding:20px; font-family:system-ui,sans-serif; }
     .frame { width:100%; height:90vh; border:1px solid #ddd; border-radius:12px; }
+    .nav-bar { margin-bottom: 8px; font-size: 1.1em; }
+    .nav-bar a { color: #7b68ee; text-decoration: none; }
+    .nav-bar a:hover { text-decoration: underline; }
+    .nav-bar .component-name { font-weight: 600; }
   </style>
 </head>
 <body>
   <h2>SHIFT</h2>
-  <iframe class="frame" src="svgs/Main.svg"></iframe>
+  <div class="nav-bar" id="nav-bar"></div>
+  <iframe id="svg-frame" class="frame" src="svgs/Main.svg"></iframe>
+
+  <script>
+    const frame = document.getElementById('svg-frame');
+    const navBar = document.getElementById('nav-bar');
+    const navStack = []; // stack of { svg, name }
+
+    // Map folder/path keywords to SVG filenames and display names
+    const componentMap = {
+      'asset-management':        { svg: 'svgs/Asset-Management.svg',        name: 'Asset Management' },
+      'benefit-cost':            { svg: 'svgs/Benefit-Cost.svg',            name: 'Benefit Cost' },
+      'bike-ped':                { svg: 'svgs/Bike-Ped.svg',                name: 'Bicycle / Pedestrian' },
+      'congestion-reliability':  { svg: 'svgs/Congestion-Reliability.svg',  name: 'Congestion & Reliability' },
+      'crash-history':           { svg: 'svgs/Crash-History.svg',           name: 'Crash History' },
+      'economic-growth':         { svg: 'svgs/Economic-Growth.svg',         name: 'Economic Growth' },
+      'input-components':        { svg: 'svgs/Input-Components.svg',        name: 'Input Components' },
+      'resilience':              { svg: 'svgs/Resilience.svg',              name: 'Resilience' },
+      'roadway-characteristics': { svg: 'svgs/Roadway-Characteristics.svg', name: 'Roadway Characteristics' },
+      'safety':                  { svg: 'svgs/Safety.svg',                  name: 'Safety' }
+    };
+
+    function updateNav() {
+      if (navStack.length === 0) {
+        navBar.innerHTML = '';
+      } else {
+        const current = navStack[navStack.length - 1];
+        navBar.innerHTML = '<a href="#" id="back-link">← Back</a> <span class="component-name">' + current.name + '</span>';
+        document.getElementById('back-link').addEventListener('click', function(e) {
+          e.preventDefault();
+          goBack();
+        });
+      }
+    }
+
+    function resolveComponent(href) {
+      if (!href) return null;
+      const lower = href.toLowerCase();
+      for (const [key, val] of Object.entries(componentMap)) {
+        if (lower.includes(key)) return val;
+      }
+      return null;
+    }
+
+    function interceptLinks() {
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        if (!doc) return;
+
+        // Handle both SVG <a> (with xlink:href or href) and HTML <a>
+        const links = doc.querySelectorAll('a');
+        links.forEach(function(link) {
+          // Clone and replace to remove any existing listeners
+          const newLink = link.cloneNode(true);
+          link.parentNode.replaceChild(newLink, link);
+
+          newLink.addEventListener('click', function(e) {
+            const href = this.getAttribute('href')
+                      || this.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+                      || '';
+            const comp = resolveComponent(href);
+            if (comp) {
+              e.preventDefault();
+              e.stopPropagation();
+              navigateTo(comp);
+            }
+            // If not a known component link, let it behave normally
+          });
+        });
+      } catch (err) {
+        console.warn('Could not intercept links in iframe:', err);
+      }
+    }
+
+    function navigateTo(comp) {
+      navStack.push(comp);
+      frame.src = comp.svg;
+      updateNav();
+    }
+
+    function goBack() {
+      if (navStack.length > 0) {
+        navStack.pop();
+        if (navStack.length > 0) {
+          // Go to previous component
+          const prev = navStack[navStack.length - 1];
+          frame.src = prev.svg;
+        } else {
+          // Go back to main
+          frame.src = 'svgs/Main.svg';
+        }
+        updateNav();
+      }
+    }
+
+    frame.addEventListener('load', interceptLinks);
+  </script>
 </body>
 </html>
