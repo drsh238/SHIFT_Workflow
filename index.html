@@ -227,6 +227,19 @@
           link.style.cursor = 'pointer';
           link.removeAttribute('href');
           link.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
+
+          // Make the entire box clickable, not just the border.
+          // Obsidian exports shapes with fill="none" so only the stroke is clickable.
+          // Changing to "transparent" keeps the look but makes the interior a hit target.
+          var shapes = link.querySelectorAll('rect, path, circle, ellipse, polygon, polyline');
+          shapes.forEach(function(shape) {
+            var fill = shape.getAttribute('fill');
+            if (!fill || fill === 'none') {
+              shape.setAttribute('fill', 'transparent');
+            }
+            shape.style.pointerEvents = 'all';
+          });
+
           link.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
