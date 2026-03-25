@@ -207,9 +207,11 @@
           svg.style.height = 'auto';
         }
 
-        attachLinkHandlers();
-        // Fit to screen on load
-        requestAnimationFrame(zoomToFit);
+        // Defer to next frame so SVG is rendered and getBBox works
+        requestAnimationFrame(function() {
+          attachLinkHandlers();
+          zoomToFit();
+        });
       } catch (err) {
         console.error('Error loading SVG:', err);
         container.innerHTML = '<p style="padding:20px;color:red;">Error loading diagram: ' + err.message + '</p>';
@@ -217,6 +219,7 @@
     }
 
     function attachLinkHandlers() {
+      const SVG_NS = 'http://www.w3.org/2000/svg';
       const links = container.querySelectorAll('a');
       links.forEach(function(link) {
         const href = link.getAttribute('href')
@@ -224,22 +227,28 @@
                   || '';
         const comp = resolveComponent(href);
         if (comp) {
-          link.style.cursor = 'pointer';
           link.removeAttribute('href');
           link.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
 
-          // Make the entire box clickable, not just the border.
-          // Obsidian exports shapes with fill="none" so only the stroke is clickable.
-          // Changing to "transparent" keeps the look but makes the interior a hit target.
-          var shapes = link.querySelectorAll('rect, path, circle, ellipse, polygon, polyline');
-          shapes.forEach(function(shape) {
-            var fill = shape.getAttribute('fill');
-            if (!fill || fill === 'none') {
-              shape.setAttribute('fill', 'transparent');
-            }
-            shape.style.pointerEvents = 'all';
-          });
+          // Add an invisible overlay rect covering the entire link bounding box.
+          // This makes the whole area clickable regardless of how Obsidian exports fills.
+          try {
+            var bbox = link.getBBox();
+            var overlay = document.createElementNS(SVG_NS, 'rect');
+            overlay.setAttribute('x', bbox.x);
+            overlay.setAttribute('y', bbox.y);
+            overlay.setAttribute('width', bbox.width);
+            overlay.setAttribute('height', bbox.height);
+            overlay.setAttribute('fill', 'transparent');
+            overlay.setAttribute('stroke', 'none');
+            overlay.style.cursor = 'pointer';
+            link.appendChild(overlay);
+          } catch(e) {
+            // getBBox can fail if element isn't rendered yet; fall back to pointer-events
+            link.style.pointerEvents = 'bounding-box';
+          }
 
+          link.style.cursor = 'pointer';
           link.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
