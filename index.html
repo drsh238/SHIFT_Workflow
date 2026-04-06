@@ -217,8 +217,12 @@
             const h = svg.getAttribute('height') || svg.getBoundingClientRect().height;
             svg.setAttribute('viewBox', '0 0 ' + parseFloat(w) + ' ' + parseFloat(h));
           }
-          svg.removeAttribute('width');
-          svg.removeAttribute('height');
+          // Set SVG to its natural viewBox size — zoomToFit handles scaling
+          const vb = svg.viewBox.baseVal;
+          svg.setAttribute('width', vb.width);
+          svg.setAttribute('height', vb.height);
+          svg.style.width = vb.width + 'px';
+          svg.style.height = vb.height + 'px';
         }
 
         // Defer to next frame so SVG is rendered and getBBox works
