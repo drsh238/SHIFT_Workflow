@@ -161,12 +161,19 @@
     function resolveComponent(href) {
       if (!href) return null;
       const lower = href.toLowerCase();
+      let bestKey = null;
+      let bestVal = null;
       for (const [key, val] of Object.entries(componentMap)) {
-        if (lower.includes(key)) return val;
+        if (lower.includes(key)) {
+          if (!bestKey || key.length > bestKey.length) {
+            bestKey = key;
+            bestVal = val;
+          }
+        }
       }
-      return null;
+      return bestVal;
     }
-
+    
     function updateNav() {
       if (navStack.length === 0) {
         navBar.innerHTML = '';
