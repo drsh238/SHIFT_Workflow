@@ -201,7 +201,12 @@
         const response = await fetch(svgPath);
         if (!response.ok) throw new Error('Failed to load ' + svgPath);
         const svgText = await response.text();
+
+        // Reset zoom before injecting so zoomToFit measures correctly
+        setZoom(1);
         container.innerHTML = svgText;
+
+        
 
         // Remove any fixed width/height on the SVG so it respects the container
         const svg = container.querySelector('svg');
