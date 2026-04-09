@@ -199,9 +199,10 @@
       }
     }
 
+    const CACHE_VERSION = 'v=' + Date.now();  // bump this when you update SVGs
     async function loadSVG(svgPath) {
       try {
-        const response = await fetch(svgPath);
+        const response = await fetch(svgPath + '?' + CACHE_VERSION);
         if (!response.ok) throw new Error('Failed to load ' + svgPath);
         const svgText = await response.text();
 
