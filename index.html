@@ -162,6 +162,33 @@
       }
     }, { passive: false });
 
+    // --- Pan with left-click drag ---
+    let isPanning = false;
+    let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
+
+    viewport.addEventListener('mousedown', function(e) {
+      // Only pan on left click, and not when clicking a link
+      if (e.button !== 0 || e.target.closest('a')) return;
+      isPanning = true;
+      panStart = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: viewport.scrollLeft,
+        scrollTop: viewport.scrollTop
+      };
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', function(e) {
+      if (!isPanning) return;
+      viewport.scrollLeft = panStart.scrollLeft - (e.clientX - panStart.x);
+      viewport.scrollTop = panStart.scrollTop - (e.clientY - panStart.y);
+    });
+
+    window.addEventListener('mouseup', function() {
+      isPanning = false;
+    });
+
     // --- Navigation ---
     function resolveComponent(href) {
       if (!href) return null;
